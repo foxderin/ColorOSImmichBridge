@@ -16,7 +16,8 @@ app or file manager that speaks SAF/DocumentsUI.
 - MIME types: `image/*`, `video/*`
 - Thumbnails streamed from Immich for picker grids
 - Originals are fetched on demand (cached under `cacheDir`, LRU-pruned at 1 GiB)
-- Read-only, API-key auth (`x-api-key`)
+- Read-only; accepts a permanent API key (`x-api-key`) or a session JWT
+  (`Authorization: Bearer`) — auto-detected
 
 ## Setup
 
@@ -25,11 +26,31 @@ app or file manager that speaks SAF/DocumentsUI.
    (e.g. `http://192.168.1.10:2283`) and the API key, tap **测试连接**.
 3. The root "Immich" now appears in DocumentsUI / any SAF picker.
 
-## Verified against
+## Verified
 
-- Immich API 3.2.0 OpenAPI spec (`/api/albums`, `/api/search/metadata`,
-  `/api/assets/{id}/original`, `/api/assets/{id}/thumbnail`, `/api/server/about`)
-- Android 16 (SDK 36); `minSdk 30`
+- Immich 3.2.2, real server: albums, `search/metadata` pagination, thumbnails,
+  originals (byte-identical to `/api/assets/{id}/original`)
+- End-to-end on Android 16 / ColorOS 16: NoPhotoPickerAPI rewrite →
+  DocumentsUI → Immich root → album → pick → `content://` URI returned to the
+  calling app; originals served byte-identical to the server (10679 = 10679)
+- API shapes checked against the Immich 3.2.0 OpenAPI spec (`/api/albums`,
+  `/api/search/metadata`, `/api/assets/{id}/original|thumbnail`,
+  `/api/server/version`); `minSdk 30`
+
+## ColorOS note
+
+ColorOS blocks cold-starts of freshly sideloaded apps by other apps
+(`OplusAppStartupManager: prevent start ... by contentprovider
+com.android.documentsui`), so the root may not appear until the app has been
+opened manually once. Fix: enable 自启动/允许后台运行 for Immich SAF, or (root)
+add `<dynamic pkgName="com.foxderin.immichsaf" type="1" source="1" switch="1"/>`
+to `/data/oplus/os/startup/startup_dynamic_list.xml` and reboot.
+
+## Testing without a server
+
+```bash
+python3 tools/mock_immich.py 2283 mock-key   # spec-shaped mock on :2283
+```
 
 ## Limitations
 

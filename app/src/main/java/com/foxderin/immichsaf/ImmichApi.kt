@@ -38,7 +38,14 @@ class ImmichApi(private val baseUrl: String, private val apiKey: String) {
         conn.requestMethod = method
         conn.connectTimeout = CONNECT_TIMEOUT_MS
         conn.readTimeout = READ_TIMEOUT_MS
-        conn.setRequestProperty("x-api-key", apiKey)
+        if (apiKey.isNotBlank()) {
+            // Immich accepts permanent API keys via x-api-key and session JWTs via Bearer.
+            if (apiKey.contains('.')) {
+                conn.setRequestProperty("Authorization", "Bearer $apiKey")
+            } else {
+                conn.setRequestProperty("x-api-key", apiKey)
+            }
+        }
         conn.setRequestProperty("Accept", "application/json")
         if (method == "POST") {
             conn.doOutput = true
@@ -56,11 +63,15 @@ class ImmichApi(private val baseUrl: String, private val apiKey: String) {
         return conn.inputStream.bufferedReader().use { it.readText() }
     }
 
-    /** GET /api/server/about - also used as a connection test. */
+    /** GET /api/server/version - also used as a connection test. */
     fun serverVersion(): String {
-        val conn = open("/api/server/about", "GET")
+        val conn = open("/api/server/version", "GET")
         return try {
-            JSONObject(readBody(conn)).optString("version", "unknown")
+            JSONObject(readBody(conn)).let { json ->
+                val major = json.optInt("major", -1)
+                if (major >= 0) "$major.${json.optInt("minor")}.${json.optInt("patch")}"
+                else json.optString("version", "unknown")
+            }
         } finally {
             conn.disconnect()
         }
