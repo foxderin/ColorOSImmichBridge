@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Immich SAF</string>
-    <string name="settings_title">Immich SAF</string>
+    <string name="app_name">ColorOS Immich Bridge</string>
+    <string name="settings_title">ColorOS Immich Bridge</string>
     <string name="settings_url_hint">服务器地址 (如 http://192.168.1.10:2283)</string>
     <string name="settings_key_hint">API Key (Immich 设置 → API 密钥)</string>
     <string name="settings_save">保存</string>

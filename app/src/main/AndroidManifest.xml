@@ -21,7 +21,7 @@
 
         <provider
             android:name=".ImmichDocumentsProvider"
-            android:authorities="com.foxderin.immichsaf.documents"
+            android:authorities="com.foxderin.colorosimmichbridge.documents"
             android:exported="true"
             android:grantUriPermissions="true"
             android:permission="android.permission.MANAGE_DOCUMENTS">

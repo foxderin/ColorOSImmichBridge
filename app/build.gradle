@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "com.foxderin.immichsaf"
+    namespace = "com.foxderin.colorosimmichbridge"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.foxderin.immichsaf"
+        applicationId = "com.foxderin.colorosimmichbridge"
         minSdk = 30
         targetSdk = 36
         versionCode = 2

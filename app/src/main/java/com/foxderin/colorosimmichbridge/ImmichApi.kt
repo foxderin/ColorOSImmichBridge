@@ -1,4 +1,4 @@
-package com.foxderin.immichsaf
+package com.foxderin.colorosimmichbridge
 
 import android.content.Context
 import android.util.Log

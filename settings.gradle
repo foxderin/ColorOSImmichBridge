@@ -13,5 +13,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "ImmichSAF"
+rootProject.name = "ColorOSImmichBridge"
 include ':app'

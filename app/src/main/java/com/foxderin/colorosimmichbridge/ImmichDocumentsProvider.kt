@@ -1,4 +1,4 @@
-package com.foxderin.immichsaf
+package com.foxderin.colorosimmichbridge
 
 import android.database.Cursor
 import android.database.MatrixCursor
@@ -23,7 +23,7 @@ import java.io.FileNotFoundException
 class ImmichDocumentsProvider : DocumentsProvider() {
 
     companion object {
-        const val AUTHORITY = "com.foxderin.immichsaf.documents"
+        const val AUTHORITY = "com.foxderin.colorosimmichbridge.documents"
         private const val TAG = "ImmichSAF"
 
         private const val ROOT_ID = "root"

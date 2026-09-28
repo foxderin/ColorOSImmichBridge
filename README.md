@@ -1,17 +1,17 @@
-# Immich SAF
+# ColorOS Immich Bridge
 
-Android **Storage Access Framework** provider for [Immich](https://immich.app).
+Android **Storage Access Framework** provider for [Immich](https://immich.app), built for ColorOS.
 Exposes your Immich server as a document source, so any app's file/photo picker
 can browse and select assets straight from Immich — no photo picker, no
 upload/download round trips.
 
-Built for use together with [NoPhotoPickerAPI](https://github.com/foxderin/NoPhotoPickerAPI)
+Use together with [NoPhotoPickerAPI](https://github.com/foxderin/NoPhotoPickerAPI)
 (which redirects forced Photo Picker requests to SAF), but it works with any
 app or file manager that speaks SAF/DocumentsUI.
 
 ## What it does
 
-- Registers as a `DocumentsProvider` (`com.foxderin.immichsaf.documents`)
+- Registers as a `DocumentsProvider` (`com.foxderin.colorosimmichbridge.documents`)
 - Roots: **全部照片** (all assets, newest first) + one folder per album
 - MIME types: `image/*`, `video/*`
 - Thumbnails streamed from Immich for picker grids
@@ -43,7 +43,7 @@ ColorOS blocks cold-starts of freshly sideloaded apps by other apps
 (`OplusAppStartupManager: prevent start ... by contentprovider
 com.android.documentsui`), so the root may not appear until the app has been
 opened manually once. Fix: enable 自启动/允许后台运行 for Immich SAF, or (root)
-add `<dynamic pkgName="com.foxderin.immichsaf" type="1" source="1" switch="1"/>`
+add `<dynamic pkgName="com.foxderin.colorosimmichbridge" type="1" source="1" switch="1"/>`
 to `/data/oplus/os/startup/startup_dynamic_list.xml` and reboot.
 
 ## Testing without a server
