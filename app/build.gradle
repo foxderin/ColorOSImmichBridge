@@ -1,0 +1,42 @@
+plugins {
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.android)
+}
+
+android {
+    namespace = "com.foxderin.immichsaf"
+    compileSdk = 36
+
+    defaultConfig {
+        applicationId = "com.foxderin.immichsaf"
+        minSdk = 30
+        targetSdk = 36
+        versionCode = 1
+        versionName = "0.1"
+    }
+
+    buildTypes {
+        release {
+            // Fork-friendly CI: fall back to debug signing so APKs stay installable.
+            signingConfig = signingConfigs.findByName("debug")
+            minifyEnabled = true
+            shrinkResources = true
+            proguardFiles(
+                    getDefaultProguardFile("proguard-android-optimize.txt"),
+                    "proguard-rules.pro"
+            )
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
+    }
+
+    kotlinOptions {
+        jvmTarget = JavaVersion.VERSION_11.toString()
+    }
+}
+
+dependencies {
+}

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Immich SAF</string>
+    <string name="settings_title">Immich SAF</string>
+    <string name="settings_url_hint">服务器地址 (如 http://192.168.1.10:2283)</string>
+    <string name="settings_key_hint">API Key (Immich 设置 → API 密钥)</string>
+    <string name="settings_save">保存</string>
+    <string name="settings_test">测试连接</string>
+    <string name="settings_saved">已保存</string>
+    <string name="settings_testing">连接测试中…</string>
+    <string name="settings_ok">连接成功：Immich %1$s，共 %2$d 个相册</string>
+    <string name="settings_failed">连接失败：%1$s</string>
+</resources>
