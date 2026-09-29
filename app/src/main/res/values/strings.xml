@@ -23,6 +23,4 @@
     <string name="video_badge">▶ 视频</string>
     <string name="no_player">没有可用的视频播放器</string>
     <string name="open_with">选择应用查看</string>
-    <string name="action_open_web">在浏览器中打开（可删除/编辑）</string>
-    <string name="action_open_app">发送到 Immich 应用（本地副本）</string>
 </resources>

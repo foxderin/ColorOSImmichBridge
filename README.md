@@ -66,7 +66,8 @@ python3 tools/mock_immich.py 2283 mock-key   # spec-shaped mock on :2283
   pickers responsive.
 - Originals are downloaded before being handed out (random access / video
   seeking); first open of a large video takes as long as the download.
-- Read-only: no upload, delete or rename through SAF.
+- SAF surface stays read-only (no upload, delete or rename); long-press any
+  asset to open it through the system viewer chooser (same as SAF "open with").
 - Bridged picker chains (NoPhotoPickerAPI → DocumentsUI/file manager → picker):
   the final caller gets a session-scoped read grant. `takePersistableUriPermission`
   is refused by the framework for explicit owner grants; persistable access

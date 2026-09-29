@@ -243,66 +243,22 @@ class ImmichPickerActivity : AppCompatActivity() {
     }
 
     /**
-     * Long-press menu: the Immich app cannot deep-link to a server asset (its
-     * VIEW filter only accepts local content:// URIs and imports a copy), so
-     * offer the web asset page for real operations alongside it.
+     * Hands the asset to the system viewer chooser (same as SAF's "open with"):
+     * a plain ACTION_VIEW on our provider URI with the grant flag — the system
+     * decides which installed app handles it.
      */
-    private fun showAssetActions(asset: ImmichAsset) {
-        val options = arrayOf(
-            getString(R.string.action_open_web),
-            getString(R.string.action_open_app),
-        )
-        androidx.appcompat.app.AlertDialog.Builder(this)
-            .setTitle(asset.name)
-            .setItems(options) { _, which ->
-                when (which) {
-                    0 -> openInWeb(asset)
-                    else -> openInImmichApp(asset)
-                }
-            }
-            .show()
-    }
-
-    /** Opens the asset's page in the Immich web UI — full server-side actions. */
-    private fun openInWeb(asset: ImmichAsset) {
-        val (baseUrl, _) = Prefs.load(this)
-        if (baseUrl.isBlank()) {
-            Toast.makeText(this, R.string.not_configured, Toast.LENGTH_SHORT).show()
-            return
-        }
-        val url = baseUrl.trimEnd('/') + "/photos/" + asset.id
-        try {
-            startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)))
-        } catch (t: Throwable) {
-            Log.w(TAG, "no browser for $url: $t")
-            Toast.makeText(this, R.string.no_player, Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    /** Hands a local copy to the official Immich app (it imports, not deep-links). */
-    private fun openInImmichApp(asset: ImmichAsset) {
+    private fun openWithSystem(asset: ImmichAsset) {
         val uri = android.net.Uri.parse(
             "content://${ImmichDocumentsProvider.AUTHORITY}/document/asset:${asset.id}"
         )
-        try {
-            // applicationContext: the grant must outlive this activity.
-            applicationContext.grantUriPermission(
-                IMMICH_APP_PACKAGE, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        } catch (t: Throwable) {
-            Log.w(TAG, "grant to $IMMICH_APP_PACKAGE failed: $t")
-        }
         val view = Intent(Intent.ACTION_VIEW)
             .setDataAndType(uri, if (asset.isVideo) "video/*" else "image/*")
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         try {
-            startActivity(Intent(view).setPackage(IMMICH_APP_PACKAGE))
+            startActivity(Intent.createChooser(view, getString(R.string.open_with)))
         } catch (t: Throwable) {
-            try {
-                startActivity(Intent.createChooser(view, getString(R.string.open_with)))
-            } catch (t2: Throwable) {
-                Log.w(TAG, "no viewer for ${asset.id}: $t2")
-                Toast.makeText(this, R.string.no_player, Toast.LENGTH_SHORT).show()
-            }
+            Log.w(TAG, "no viewer for ${asset.id}: $t")
+            Toast.makeText(this, R.string.no_player, Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -409,10 +365,9 @@ class ImmichPickerActivity : AppCompatActivity() {
                 holder.itemView.setOnClickListener {
                     if (browseOnly) openInBrowser(asset) else pick(asset)
                 }
-                // Long-press: view the real asset (web) or hand a local copy
-                // to the official Immich app.
+                // Long-press: hand the asset to the system viewer chooser.
                 holder.itemView.setOnLongClickListener {
-                    showAssetActions(asset)
+                    openWithSystem(asset)
                     true
                 }
             }
