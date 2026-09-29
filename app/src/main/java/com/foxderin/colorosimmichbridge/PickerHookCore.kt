@@ -50,6 +50,9 @@ object PickerHookCore {
     /** Set when our UI is opened from the main file manager (no pick caller). */
     const val EXTRA_BROWSE_ONLY = "immich.extra.browse_only"
 
+    /** Packages to grant the picked URI to (caller chain seen by the hook). */
+    const val EXTRA_GRANT_TARGETS = "immich.extra.grant_targets"
+
     const val MODULE_PACKAGE = "com.foxderin.colorosimmichbridge"
     const val IMMICH_PICKER_ACTIVITY = "com.foxderin.colorosimmichbridge.ImmichPickerActivity"
 
@@ -101,15 +104,31 @@ object PickerHookCore {
     @Volatile
     private var currentSpec = MediaSpec(true, true)
 
+    /** Packages to grant the picked URI to, reported by the bridged caller
+     *  (NoPhotoPickerAPI puts them on the picker intent). */
+    @Volatile
+    private var bridgedGrantTargets: List<String> = emptyList()
+
     /** Hooked from PickerActivity#onCreate: captures the caller's MIME constraints. */
     fun onPickerCreated(activity: Activity?) {
         refreshSpec(activity?.intent)
+        refreshGrantTargets(activity?.intent)
     }
 
     /** Hooked from PickerActivity#onNewIntent: the activity's getIntent() is
      *  still the ORIGINAL intent inside onNewIntent, so read the argument. */
     fun onPickerNewIntent(intent: Intent?) {
         refreshSpec(intent)
+        refreshGrantTargets(intent)
+    }
+
+    private fun refreshGrantTargets(intent: Intent?) {
+        @Suppress("DEPRECATION")
+        bridgedGrantTargets =
+            intent?.getStringArrayListExtra("npp_grant_targets") ?: emptyList()
+        if (bridgedGrantTargets.isNotEmpty()) {
+            log("bridged grant targets: $bridgedGrantTargets")
+        }
     }
 
     private fun refreshSpec(intent: Intent?) {
@@ -224,6 +243,26 @@ object PickerHookCore {
             val intent = Intent().setClassName(MODULE_PACKAGE, IMMICH_PICKER_ACTIVITY)
                 .putExtra(MediaSpec.EXTRA_IMAGES, currentSpec.images)
                 .putExtra(MediaSpec.EXTRA_VIDEOS, currentSpec.videos)
+            // The picker's caller chain (NPP interceptor, original app) is not
+            // visible to our activity's getCallingActivity() in every flow;
+            // collect every package we can see here and let the picker grant
+            // the result URI to them explicitly.
+            val grantTargets = LinkedHashSet<String>()
+            host.packageName?.let { grantTargets += it }
+            grantTargets += bridgedGrantTargets
+            // The bridged picker's intent may carry the packages that must
+            // hold the result URI (the interceptor and the original caller).
+            @Suppress("DEPRECATION")
+            (host as? Activity)?.intent
+                ?.getStringArrayListExtra("npp_grant_targets")
+                ?.let { grantTargets += it }
+            // The picker's referrer is the app that launched it — in the
+            // bridged chain that is the interceptor (or original caller), which
+            // the framework must be able to grant the result URI to.
+            referrerPackage(host)?.let { grantTargets += it }
+            if (grantTargets.isNotEmpty()) {
+                intent.putExtra(EXTRA_GRANT_TARGETS, ArrayList(grantTargets))
+            }
             // The picker host has a caller waiting for a result; anywhere else
             // (main UI, album set…) our UI opens in browse mode.
             val pickerHost = (host as? Activity)
@@ -242,6 +281,22 @@ object PickerHookCore {
         } catch (t: Throwable) {
             log("onSuperAppClick failed: $t")
             false
+        }
+    }
+
+    /**
+     * Package of the context's referrer, via reflection: Activity has two
+     * getReferrer() overloads (deprecated Uri and Intent), and direct Kotlin
+     * property access picks the wrong one.
+     */
+    private fun referrerPackage(context: android.content.Context): String? {
+        return try {
+            // getLaunchedFromPackage(): the app that launched this activity —
+            // in the bridged chain that is the interceptor (or original app).
+            val method = android.app.Activity::class.java.getMethod("getLaunchedFromPackage")
+            (method.invoke(context) as? String)?.takeIf { it.isNotEmpty() && it != "android" }
+        } catch (t: Throwable) {
+            null
         }
     }
 

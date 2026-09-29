@@ -22,4 +22,5 @@
     <string name="all_photos">全部照片</string>
     <string name="video_badge">▶ 视频</string>
     <string name="no_player">没有可用的视频播放器</string>
+    <string name="open_with">选择应用查看</string>
 </resources>

@@ -34,6 +34,7 @@ class ImmichPickerActivity : AppCompatActivity() {
         const val TYPE_ALBUM = 0
         const val TYPE_PHOTO = 1
         const val ALL_ID = ""
+        const val IMMICH_APP_PACKAGE = "app.alextran.immich"
     }
 
     private lateinit var grid: RecyclerView
@@ -115,7 +116,6 @@ class ImmichPickerActivity : AppCompatActivity() {
     }
 
     private fun loadAlbums() {
-        openAlbum = null
         showLoading(true)
         safeIo {
             val result = runCatching { api().listAlbums() }
@@ -124,9 +124,13 @@ class ImmichPickerActivity : AppCompatActivity() {
                 result.onSuccess {
                     // Pseudo-album first: library items outside any album
                     // (e.g. loose videos) must be reachable too.
+                    // Flip mode and data together with the notification: a
+                    // synchronous flip would leave view types/counts
+                    // inconsistent for any layout pass in between.
                     albums = listOf(
                         ImmichAlbum(ALL_ID, getString(R.string.all_photos), 0, null)
                     ) + it
+                    openAlbum = null
                     updateChrome(getString(R.string.albums_title), showUp = false)
                     adapter.notifyDataSetChanged()
                     toggleEmpty(albums.isEmpty())
@@ -137,7 +141,6 @@ class ImmichPickerActivity : AppCompatActivity() {
     }
 
     private fun loadAssets(album: ImmichAlbum) {
-        openAlbum = album
         showLoading(true)
         safeIo {
             val result = runCatching {
@@ -149,7 +152,10 @@ class ImmichPickerActivity : AppCompatActivity() {
                     // Caller constraint: e.g. image/* callers never see videos.
                     val filtered = it.filter { a -> if (a.isVideo) allowVideos else allowImages }
                     Log.d(TAG, "assets: ${it.size} loaded, ${filtered.size} after spec filter")
+                    // Mode flip, data and notification must be one atomic
+                    // main-thread step (see loadAlbums).
                     assets = filtered
+                    openAlbum = album
                     updateChrome(album.name, showUp = true)
                     adapter.notifyDataSetChanged()
                     toggleEmpty(assets.isEmpty())
@@ -175,7 +181,7 @@ class ImmichPickerActivity : AppCompatActivity() {
                     // storms that could invalidate the tapped position mid-tap.
                     val idx = if (openAlbum == null) albums.indexOfFirst { it.thumbAssetId == id }
                     else assets.indexOfFirst { it.id == id }
-                    if (idx >= 0) adapter.notifyItemChanged(idx)
+                    if (idx in 0 until adapter.itemCount) adapter.notifyItemChanged(idx)
                 }
             }
         }
@@ -236,12 +242,65 @@ class ImmichPickerActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * Opens the asset in the official Immich app. It registers a VIEW filter
+     * for content:// image/video URIs; we hold the provider, so grant it the
+     * read permission explicitly.
+     */
+    private fun openInImmichApp(asset: ImmichAsset) {
+        val uri = android.net.Uri.parse(
+            "content://${ImmichDocumentsProvider.AUTHORITY}/document/asset:${asset.id}"
+        )
+        try {
+            grantUriPermission(
+                IMMICH_APP_PACKAGE, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        } catch (t: Throwable) {
+            Log.w(TAG, "grant to $IMMICH_APP_PACKAGE failed: $t")
+        }
+        val view = Intent(Intent.ACTION_VIEW)
+            .setDataAndType(uri, if (asset.isVideo) "video/*" else "image/*")
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        try {
+            startActivity(Intent(view).setPackage(IMMICH_APP_PACKAGE))
+        } catch (t: Throwable) {
+            try {
+                startActivity(Intent.createChooser(view, getString(R.string.open_with)))
+            } catch (t2: Throwable) {
+                Log.w(TAG, "no viewer for ${asset.id}: $t2")
+                Toast.makeText(this, R.string.no_player, Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
     private fun pick(asset: ImmichAsset) {
         val uri = android.net.Uri.parse(
             "content://${ImmichDocumentsProvider.AUTHORITY}/document/asset:${asset.id}"
         )
         Log.d(TAG, "pick asset=${asset.id} name=${asset.name}")
         Prefs.saveAssetMeta(this, asset)
+        // As the provider owner we can grant the URI onward explicitly. The
+        // framework-side propagation can drop it when the result travels
+        // through intermediate apps (Xposed-bridged picker chains), leaving
+        // the next hop with a SecurityException. Grant to every package we can
+        // identify: the hook-reported caller chain, our own caller and referrer.
+        val targets = LinkedHashSet<String>()
+        @Suppress("DEPRECATION")
+        intent.getStringArrayListExtra(PickerHookCore.EXTRA_GRANT_TARGETS)?.let { targets += it }
+        callingActivity?.packageName?.let { targets += it }
+        for (pkg in targets) {
+            try {
+                // applicationContext: activity-scoped grants are revoked when
+                // this activity finishes, which happens before the caller
+                // chain forwards the result.
+                applicationContext.grantUriPermission(
+                    pkg, uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                            Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
+                Log.d(TAG, "granted read to $pkg")
+            } catch (t: Throwable) {
+                Log.w(TAG, "grantUriPermission to $pkg failed: $t")
+            }
+        }
         setResult(RESULT_OK, Intent().apply {
             data = uri
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
@@ -274,6 +333,16 @@ class ImmichPickerActivity : AppCompatActivity() {
 
     private inner class Adapter : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
+        init {
+            // Stable ids keep RecyclerView from throwing "Inconsistency
+            // detected" when per-item thumbnail updates race list swaps.
+            setHasStableIds(true)
+        }
+
+        override fun getItemId(position: Int): Long =
+            if (openAlbum == null) albums.getOrNull(position)?.name?.hashCode()?.toLong() ?: -1L
+            else assets.getOrNull(position)?.id?.hashCode()?.toLong() ?: -1L
+
         override fun getItemViewType(position: Int): Int =
             if (openAlbum == null) TYPE_ALBUM else TYPE_PHOTO
 
@@ -305,6 +374,11 @@ class ImmichPickerActivity : AppCompatActivity() {
                     if (asset.isVideo) View.VISIBLE else View.GONE
                 holder.itemView.setOnClickListener {
                     if (browseOnly) openInBrowser(asset) else pick(asset)
+                }
+                // Long-press: hand the asset to the official Immich app.
+                holder.itemView.setOnLongClickListener {
+                    openInImmichApp(asset)
+                    true
                 }
             }
         }
