@@ -55,7 +55,7 @@ class ImmichViewerActivity : AppCompatActivity() {
 
         // Preview first (fast), original second (sharp).
         io.execute {
-            val preview = api.thumbnailBytes(assetId, preview = false)
+            val preview = api.thumbnailBytes(assetId, preview = true)
             if (preview != null) {
                 val bmp = BitmapFactory.decodeByteArray(preview, 0, preview.size)
                 if (bmp != null) main.post {
@@ -63,7 +63,12 @@ class ImmichViewerActivity : AppCompatActivity() {
                     progress.visibility = View.GONE
                 }
             }
-            val dest = File(cacheDir, "viewer_$assetId.bin")
+            // Same dir/naming scheme as the provider so its 1 GiB prune covers
+            // viewed originals too.
+            val dir = File(cacheDir, "assets").apply { mkdirs() }
+            val safeName = intent.getStringExtra(EXTRA_NAME).orEmpty()
+                .replace(Regex("[^A-Za-z0-9._-]"), "_").takeLast(80)
+            val dest = File(dir, "view-$assetId-$safeName")
             if (api.downloadOriginal(assetId, dest)) {
                 val bmp = decodeSampled(dest)
                 if (bmp != null) main.post { image.setImageBitmap(bmp) }
