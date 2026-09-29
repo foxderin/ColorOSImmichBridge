@@ -254,6 +254,24 @@ class ImmichPickerActivity : AppCompatActivity() {
         val view = Intent(Intent.ACTION_VIEW)
             .setDataAndType(uri, if (asset.isVideo) "video/*" else "image/*")
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        // Insurance: framework grant forwarding through the chooser has failed
+        // in bridged chains, so hand every resolver package the read grant
+        // directly (we are the provider owner).
+        try {
+            packageManager.queryIntentActivities(view, 0)
+                .map { it.activityInfo.packageName }
+                .distinct()
+                .forEach { pkg ->
+                    try {
+                        applicationContext.grantUriPermission(
+                            pkg, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    } catch (t: Throwable) {
+                        Log.w(TAG, "grant to $pkg failed: $t")
+                    }
+                }
+        } catch (t: Throwable) {
+            Log.w(TAG, "resolver query failed: $t")
+        }
         try {
             startActivity(Intent.createChooser(view, getString(R.string.open_with)))
         } catch (t: Throwable) {
