@@ -20,7 +20,8 @@ app or file manager that speaks SAF/DocumentsUI.
   (`Authorization: Bearer`) — auto-detected
 - Settings and picker UI are Material Design 3 (Material You dynamic colors
   on Android 12+)
-- LSPosed module (dual entry: libxposed 102 + legacy api:82): registers an
+- LSPosed module (libxposed API 102, META-INF/xposed/java_init.list +
+  module.prop): registers an
   **Immich** row in the ColorOS file picker's 文件 tab source list
   (`MainExpandableAdapter`'s `pl.b` row list, appended in
   `parentchild.b#t/s`), routes its click to a Material 3 Immich browser, and

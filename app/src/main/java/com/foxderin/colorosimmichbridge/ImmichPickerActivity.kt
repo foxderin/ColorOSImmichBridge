@@ -206,6 +206,36 @@ class ImmichPickerActivity : AppCompatActivity() {
         runCatching { io.execute(task) }
     }
 
+    /**
+     * Browse mode (launched from the main file manager): the caller has no
+     * result to receive, so a tap opens the asset for viewing instead of
+     * picking it.
+     */
+    private val browseOnly: Boolean by lazy {
+        intent.getBooleanExtra(PickerHookCore.EXTRA_BROWSE_ONLY, false) ||
+                callingActivity == null
+    }
+
+    private fun openInBrowser(asset: ImmichAsset) {
+        if (asset.isVideo) {
+            // Hand videos to an external player over our provider URI.
+            val uri = android.net.Uri.parse(
+                "content://${ImmichDocumentsProvider.AUTHORITY}/document/asset:${asset.id}"
+            )
+            val play = Intent(Intent.ACTION_VIEW)
+                .setDataAndType(uri, "video/*")
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            try {
+                startActivity(play)
+            } catch (t: Throwable) {
+                Log.w(TAG, "no player for ${asset.id}: $t")
+                Toast.makeText(this, R.string.no_player, Toast.LENGTH_SHORT).show()
+            }
+        } else {
+            startActivity(ImmichViewerActivity.intent(this, asset))
+        }
+    }
+
     private fun pick(asset: ImmichAsset) {
         val uri = android.net.Uri.parse(
             "content://${ImmichDocumentsProvider.AUTHORITY}/document/asset:${asset.id}"
@@ -273,7 +303,9 @@ class ImmichPickerActivity : AppCompatActivity() {
                 image.setImageBitmap(thumbs.get(asset.id))
                 holder.itemView.findViewById<TextView>(R.id.cell_badge).visibility =
                     if (asset.isVideo) View.VISIBLE else View.GONE
-                holder.itemView.setOnClickListener { pick(asset) }
+                holder.itemView.setOnClickListener {
+                    if (browseOnly) openInBrowser(asset) else pick(asset)
+                }
             }
         }
     }

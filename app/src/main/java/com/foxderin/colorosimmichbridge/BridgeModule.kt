@@ -53,13 +53,31 @@ class BridgeModule : XposedModule() {
             PickerHookCore.SUPER_APP_CLICK, "onSuperAppItemClick",
             arrayOf(PickerHookCore.SUPER_APP_BEAN), classLoader,
         ) { chain ->
-            if (PickerHookCore.onSuperAppClick(chain.thisObject, chain.args.getOrNull(0))) {
+            val handled = PickerHookCore.onSuperAppClick(chain.thisObject, chain.args.getOrNull(0))
+            PickerHookCore.log("click hook fired, handled=$handled")
+            if (handled) {
                 null
             } else {
                 chain.proceed()
             }
         }
-
+        // Same row click outside the picker fragment: other t7.q implementers
+        // (main UI, album set, single picker…) dispatch source-row clicks too.
+        // The bean identity check in onSuperAppClick makes extra hooks harmless.
+        var extraClickHooks = 0
+        for (clickClass in PickerHookCore.EXTRA_CLICK_CLASSES) {
+            extraClickHooks += hookExact(
+                clickClass, "onSuperAppItemClick",
+                arrayOf(PickerHookCore.SUPER_APP_BEAN), classLoader, quiet = true,
+            ) { chain ->
+                if (PickerHookCore.onSuperAppClick(chain.thisObject, chain.args.getOrNull(0))) {
+                    null
+                } else {
+                    chain.proceed()
+                }
+            }
+        }
+        PickerHookCore.log("hooked extra click classes x$extraClickHooks")
         // Forward our picker's result through the host activity to the caller.
         hookExact(PickerHookCore.FRAGMENT_ACTIVITY, "onActivityResult",
             arrayOf("int", "int", "android.content.Intent"), classLoader) { chain ->
@@ -87,13 +105,14 @@ class BridgeModule : XposedModule() {
         name: String,
         paramTypeNames: Array<String>,
         classLoader: ClassLoader,
+        quiet: Boolean = false,
         body: (XposedInterface.Chain) -> Any?,
-    ) {
+    ): Int {
         val clazz = try {
             Class.forName(className, false, classLoader)
         } catch (t: Throwable) {
-            PickerHookCore.log("$className not found: $t")
-            return
+            if (!quiet) PickerHookCore.log("$className not found: $t")
+            return 0
         }
         var current: Class<*>? = clazz
         var hooked = 0
@@ -112,6 +131,7 @@ class BridgeModule : XposedModule() {
             }
             current = current.superclass
         }
-        PickerHookCore.log("hooked ${clazz.simpleName}#$name x$hooked")
+        if (!quiet) PickerHookCore.log("hooked ${clazz.simpleName}#$name x$hooked")
+        return hooked
     }
 }

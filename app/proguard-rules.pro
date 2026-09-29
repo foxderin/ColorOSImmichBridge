@@ -1,7 +1,6 @@
-# Xposed entry points are referenced only from assets/xposed_init and
-# META-INF/xposed/java_init.list, which R8 does not treat as roots.
+# Xposed entry point is referenced only from META-INF/xposed/java_init.list,
+# which R8 does not treat as a root.
 -keep class com.foxderin.colorosimmichbridge.BridgeModule { *; }
--keep class com.foxderin.colorosimmichbridge.LegacyBridgeModule { *; }
 -keep class com.foxderin.colorosimmichbridge.PickerHookCore { *; }
 
 # DocumentsProvider is referenced from the manifest; keep it and the rest

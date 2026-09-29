@@ -7,7 +7,7 @@ import android.graphics.drawable.Drawable
 import android.util.Log
 
 /**
- * Hook logic shared by both Xposed entry points ([BridgeModule], [LegacyBridgeModule]).
+ * Hook logic for the libxposed API 102 entry point ([BridgeModule]).
  *
  * The ColorOS picker's 文件 tab sources (蓝牙/下载/微信/…) are `pl.b` beans held
  * in a list field of `MainExpandableAdapter` (populated before the group list
@@ -27,11 +27,28 @@ object PickerHookCore {
 
     /** Dispatches source-row clicks in the picker. */
     const val SUPER_APP_CLICK = "com.oplus.filemanager.picker.category.PickerCategoryFragment\$i"
+
+    /** Other onSuperAppItemClick implementers that can dispatch source-row clicks
+     *  (file manager 16.12.4). Hooked in addition to [SUPER_APP_CLICK]. */
+    val EXTRA_CLICK_CLASSES = listOf(
+        "com.oplus.filemanager.main.adapter.MainExpandableAdapter\$f",
+        "com.oplus.filemanager.main.adapter.MainExpandableAdapter\$j",
+        "com.oplus.filemanager.main.adapter.MainExpandableAdapter\$o",
+        "com.oplus.filemanager.main.ui.category.MainCategoryFragment\$f0",
+        "com.oplus.filemanager.main.ui.category.MainCategoryFragment\$h0",
+        "com.oplus.filemanager.main.ui.category.MainCategoryFragment\$r0",
+        "com.oplus.filemanager.picker.category.PickerCategoryFragment\$g",
+        "com.oplus.filemanager.category.albumset.ui.PickerAlbumSetFragment",
+        "com.oplus.filemanager.filechoose.ui.singlepicker.SinglePickerFragment",
+    )
     const val SUPER_APP_BEAN = "pl.b"
     const val FRAGMENT_ACTIVITY = "androidx.fragment.app.FragmentActivity"
 
     /** Request code between the ColorOS picker and our Immich picker activity. */
     const val REQUEST_IMMICH = 0xB1D6
+
+    /** Set when our UI is opened from the main file manager (no pick caller). */
+    const val EXTRA_BROWSE_ONLY = "immich.extra.browse_only"
 
     const val MODULE_PACKAGE = "com.foxderin.colorosimmichbridge"
     const val IMMICH_PICKER_ACTIVITY = "com.foxderin.colorosimmichbridge.ImmichPickerActivity"
@@ -199,25 +216,25 @@ object PickerHookCore {
             return true
         }
         return try {
-            // The static inner class holds the fragment in an R8-renamed
-            // synthetic field; find it by type, not by name.
-            var activity: Activity? = null
-            for (f in inner.javaClass.declaredFields) {
-                if (!f.type.name.contains("PickerCategoryFragment")) continue
-                f.isAccessible = true
-                val fragment = f.get(inner) ?: continue
-                activity = fragment.javaClass.getMethod("getActivity").invoke(fragment) as? Activity
-                if (activity != null) break
-            }
-            if (activity == null) {
-                log("onSuperAppClick: no activity")
+            val host = resolveHost(inner)
+            if (host == null) {
+                log("onSuperAppClick: no host context")
                 return false
             }
             val intent = Intent().setClassName(MODULE_PACKAGE, IMMICH_PICKER_ACTIVITY)
                 .putExtra(MediaSpec.EXTRA_IMAGES, currentSpec.images)
                 .putExtra(MediaSpec.EXTRA_VIDEOS, currentSpec.videos)
-            activity.startActivityForResult(intent, REQUEST_IMMICH)
-            log("Launched Immich picker from source row")
+            if (host is Activity) {
+                host.startActivityForResult(intent, REQUEST_IMMICH)
+                log("Launched Immich picker from source row")
+            } else {
+                // Main-UI listener: no result caller; open in browse mode.
+                host.startActivity(
+                    intent.putExtra(EXTRA_BROWSE_ONLY, true)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                )
+                log("Launched Immich browser from source row")
+            }
             true
         } catch (t: Throwable) {
             log("onSuperAppClick failed: $t")
@@ -225,8 +242,40 @@ object PickerHookCore {
         }
     }
 
+    /**
+     * Resolves a Context for launching our UI from a row-click listener:
+     * a CategoryFragment-typed synthetic field → its Activity (picker path), or
+     * any Context field on the listener or its enclosing object (adapter path).
+     */
+    private fun resolveHost(inner: Any): android.content.Context? {
+        var context: android.content.Context? = null
+        for (f in inner.javaClass.declaredFields) {
+            f.isAccessible = true
+            val v = f.get(inner) ?: continue
+            if (f.type.name.contains("CategoryFragment")) {
+                val activity = v.javaClass.getMethod("getActivity").invoke(v) as? Activity
+                if (activity != null) return activity
+            }
+            if (v is android.content.Context) {
+                context = v
+            } else {
+                for (f2 in v.javaClass.declaredFields) {
+                    if (!android.content.Context::class.java.isAssignableFrom(f2.type)) continue
+                    f2.isAccessible = true
+                    val found = f2.get(v) as? android.content.Context
+                    if (found != null) { context = found; break }
+                }
+            }
+            if (context != null) break
+        }
+        return context
+    }
+
     /** Forwards our picker's result back to the app that invoked the ColorOS picker. */
     fun onPickerActivityResult(activity: Activity, requestCode: Int, resultCode: Int, data: Intent?) {
+        // Only the picker host has a caller waiting for a result; in the main
+        // file manager UI our browse-mode result must not close MainActivity.
+        if (activity.javaClass.name != PICKER_ACTIVITY) return
         if (requestCode != REQUEST_IMMICH) return
         if (resultCode == Activity.RESULT_OK && data != null) {
             data.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)

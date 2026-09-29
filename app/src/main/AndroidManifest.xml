@@ -28,6 +28,12 @@
             android:exported="true"
             android:excludeFromRecents="true"/>
 
+        <!-- Browse-mode full-screen viewer (main file manager entry). -->
+        <activity
+            android:name=".ImmichViewerActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"/>
+
         <provider
             android:name=".ImmichDocumentsProvider"
             android:authorities="com.foxderin.colorosimmichbridge.documents"
