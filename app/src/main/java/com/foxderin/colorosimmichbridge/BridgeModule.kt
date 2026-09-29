@@ -76,7 +76,12 @@ class BridgeModule : XposedModule() {
         }
     }
 
-    /** Hooks every declared method matching [name] (and [paramTypeNames] if given). */
+    /**
+     * Hooks the most-derived implementation of [name] matching [paramTypeNames]
+     * (exact match; empty array matches any overload), walking superclasses like
+     * XposedHelpers.findAndHookMethod does — e.g. PickerActivity.onNewIntent is
+     * declared in a superclass, so scanning only declaredMethods misses it.
+     */
     private fun hookExact(
         className: String,
         name: String,
@@ -90,18 +95,22 @@ class BridgeModule : XposedModule() {
             PickerHookCore.log("$className not found: $t")
             return
         }
+        var current: Class<*>? = clazz
         var hooked = 0
-        for (method in clazz.declaredMethods) {
-            if (method.name != name) continue
-            if (paramTypeNames.isNotEmpty() &&
-                method.parameterTypes.map { it.name } != paramTypeNames.toList()
-            ) continue
-            try {
-                hook(method).intercept(XposedInterface.Hooker { chain -> body(chain) })
-                hooked++
-            } catch (t: Throwable) {
-                PickerHookCore.log("hook ${clazz.simpleName}#$name failed: $t")
+        while (current != null && hooked == 0) {
+            for (method in current.declaredMethods) {
+                if (method.name != name) continue
+                if (paramTypeNames.isNotEmpty() &&
+                    method.parameterTypes.map { it.name } != paramTypeNames.toList()
+                ) continue
+                try {
+                    hook(method).intercept(XposedInterface.Hooker { chain -> body(chain) })
+                    hooked++
+                } catch (t: Throwable) {
+                    PickerHookCore.log("hook ${current.simpleName}#$name failed: $t")
+                }
             }
+            current = current.superclass
         }
         PickerHookCore.log("hooked ${clazz.simpleName}#$name x$hooked")
     }
