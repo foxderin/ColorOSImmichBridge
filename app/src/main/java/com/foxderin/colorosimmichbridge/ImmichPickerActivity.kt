@@ -243,16 +243,50 @@ class ImmichPickerActivity : AppCompatActivity() {
     }
 
     /**
-     * Opens the asset in the official Immich app. It registers a VIEW filter
-     * for content:// image/video URIs; we hold the provider, so grant it the
-     * read permission explicitly.
+     * Long-press menu: the Immich app cannot deep-link to a server asset (its
+     * VIEW filter only accepts local content:// URIs and imports a copy), so
+     * offer the web asset page for real operations alongside it.
      */
+    private fun showAssetActions(asset: ImmichAsset) {
+        val options = arrayOf(
+            getString(R.string.action_open_web),
+            getString(R.string.action_open_app),
+        )
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle(asset.name)
+            .setItems(options) { _, which ->
+                when (which) {
+                    0 -> openInWeb(asset)
+                    else -> openInImmichApp(asset)
+                }
+            }
+            .show()
+    }
+
+    /** Opens the asset's page in the Immich web UI — full server-side actions. */
+    private fun openInWeb(asset: ImmichAsset) {
+        val (baseUrl, _) = Prefs.load(this)
+        if (baseUrl.isBlank()) {
+            Toast.makeText(this, R.string.not_configured, Toast.LENGTH_SHORT).show()
+            return
+        }
+        val url = baseUrl.trimEnd('/') + "/photos/" + asset.id
+        try {
+            startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)))
+        } catch (t: Throwable) {
+            Log.w(TAG, "no browser for $url: $t")
+            Toast.makeText(this, R.string.no_player, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    /** Hands a local copy to the official Immich app (it imports, not deep-links). */
     private fun openInImmichApp(asset: ImmichAsset) {
         val uri = android.net.Uri.parse(
             "content://${ImmichDocumentsProvider.AUTHORITY}/document/asset:${asset.id}"
         )
         try {
-            grantUriPermission(
+            // applicationContext: the grant must outlive this activity.
+            applicationContext.grantUriPermission(
                 IMMICH_APP_PACKAGE, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
         } catch (t: Throwable) {
             Log.w(TAG, "grant to $IMMICH_APP_PACKAGE failed: $t")
@@ -375,9 +409,10 @@ class ImmichPickerActivity : AppCompatActivity() {
                 holder.itemView.setOnClickListener {
                     if (browseOnly) openInBrowser(asset) else pick(asset)
                 }
-                // Long-press: hand the asset to the official Immich app.
+                // Long-press: view the real asset (web) or hand a local copy
+                // to the official Immich app.
                 holder.itemView.setOnLongClickListener {
-                    openInImmichApp(asset)
+                    showAssetActions(asset)
                     true
                 }
             }
