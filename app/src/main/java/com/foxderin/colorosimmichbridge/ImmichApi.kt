@@ -8,7 +8,12 @@ import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 
-data class ImmichAlbum(val id: String, val name: String, val assetCount: Int)
+data class ImmichAlbum(
+    val id: String,
+    val name: String,
+    val assetCount: Int,
+    val thumbAssetId: String?,
+)
 
 data class ImmichAsset(
     val id: String,
@@ -88,6 +93,7 @@ class ImmichApi(private val baseUrl: String, private val apiKey: String) {
                     id = o.getString("id"),
                     name = o.optString("albumName", "album"),
                     assetCount = o.optInt("assetCount", 0),
+                    thumbAssetId = o.optString("albumThumbnailAssetId", "").ifBlank { null },
                 )
             }
         } finally {
@@ -104,6 +110,8 @@ class ImmichApi(private val baseUrl: String, private val apiKey: String) {
             if (albumId != null) put("albumIds", JSONArray(listOf(albumId)))
             put("size", size)
             put("page", page)
+            // Without this the response omits exifInfo (incl. fileSizeInByte).
+            put("withExif", true)
         }
         val conn = open("/api/search/metadata", "POST")
         return try {
@@ -118,6 +126,16 @@ class ImmichApi(private val baseUrl: String, private val apiKey: String) {
         }
     }
 
+    /** GET /api/assets/{id} - single asset metadata (cold provider lookups). */
+    fun getAsset(id: String): ImmichAsset {
+        val conn = open("/api/assets/$id", "GET")
+        return try {
+            JSONObject(readBody(conn)).toAsset()
+        } finally {
+            conn.disconnect()
+        }
+    }
+
     /** GET /api/assets/{id}/thumbnail?size=thumbnail|preview */
     fun downloadThumbnail(assetId: String, preview: Boolean, dest: File): Boolean {
         val size = if (preview) "preview" else "thumbnail"
@@ -126,6 +144,19 @@ class ImmichApi(private val baseUrl: String, private val apiKey: String) {
             if (conn.responseCode !in 200..299) return false
             writeTo(conn.inputStream, dest)
             true
+        } finally {
+            conn.disconnect()
+        }
+    }
+
+    /** Fetches a thumbnail as bytes for in-memory use. */
+    fun thumbnailBytes(assetId: String, preview: Boolean): ByteArray? {
+        val size = if (preview) "preview" else "thumbnail"
+        val conn = open("/api/assets/$assetId/thumbnail?size=$size", "GET")
+        return try {
+            if (conn.responseCode !in 200..299) null else conn.inputStream.use { it.readBytes() }
+        } catch (t: Throwable) {
+            null
         } finally {
             conn.disconnect()
         }
@@ -195,4 +226,33 @@ object Prefs {
             .apply()
         Log.d("ImmichSAF", "Settings saved: $url")
     }
+
+    /** Persisted asset metadata so a cold provider process can answer
+     *  queryDocument/getDocumentType without a network call. */
+    private const val META_FILE = "immich_asset_meta"
+
+    fun saveAssetMeta(context: Context, asset: ImmichAsset) {
+        context.getSharedPreferences(META_FILE, Context.MODE_PRIVATE).edit()
+            .putString(
+                asset.id,
+                listOf(asset.name, asset.isVideo.toString(), asset.sizeBytes.toString(), asset.modifiedMs.toString())
+                    .joinToString("|"),
+            )
+            .apply()
+    }
+
+    fun loadAssetMeta(context: Context, assetId: String): ImmichAsset? {
+        val raw = context.getSharedPreferences(META_FILE, Context.MODE_PRIVATE)
+            .getString(assetId, null) ?: return null
+        val parts = raw.split("|")
+        if (parts.size != 4) return null
+        return ImmichAsset(
+            id = assetId,
+            name = parts[0],
+            isVideo = parts[1].toBoolean(),
+            sizeBytes = parts[2].toLongOrNull() ?: 0L,
+            modifiedMs = parts[3].toLongOrNull() ?: 0L,
+        )
+    }
 }
+

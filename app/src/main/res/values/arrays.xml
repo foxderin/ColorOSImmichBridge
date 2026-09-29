@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- LSPosed scope: only the ColorOS file manager (its picker is hooked). -->
+    <string-array name="xposed_scope">
+        <item>com.coloros.filemanager</item>
+    </string-array>
+</resources>

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Bridge mark: two stacked photo frames linked by a bridge arch. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- back frame -->
+    <path
+        android:fillColor="#3B4A6B"
+        android:pathData="M30,26 h48 a6,6 0 0 1 6,6 v34 a6,6 0 0 1 -6,6 h-48 a6,6 0 0 1 -6,-6 v-34 a6,6 0 0 1 6,-6 z" />
+    <!-- front frame -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M24,38 h48 a6,6 0 0 1 6,6 v34 a6,6 0 0 1 -6,6 h-48 a6,6 0 0 1 -6,-6 v-34 a6,6 0 0 1 6,-6 z" />
+    <!-- sun -->
+    <path
+        android:fillColor="#FFB300"
+        android:pathData="M38,52 m-6,0 a6,6 0 1,0 12,0 a6,6 0 1,0 -12,0" />
+    <!-- mountains -->
+    <path
+        android:fillColor="#1FBF9C"
+        android:pathData="M18,84 l16,-20 10,12 12,-16 16,24 z" />
+    <!-- bridge arch -->
+    <path
+        android:fillColor="#2E6BE6"
+        android:pathData="M20,92 h68 v6 h-68 z" />
+    <path
+        android:fillColor="#2E6BE6"
+        android:pathData="M28,92 a26,14 0 0 1 52,0 h-8 a18,8 0 0 0 -36,0 z" />
+</vector>

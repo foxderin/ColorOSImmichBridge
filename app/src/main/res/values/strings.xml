@@ -3,6 +3,8 @@
     <string name="app_name">ColorOS Immich Bridge</string>
     <string name="settings_title">ColorOS Immich Bridge</string>
     <string name="settings_url_hint">服务器地址 (如 http://192.168.1.10:2283)</string>
+    <string name="settings_section_server">Immich 服务器</string>
+    <string name="settings_url_placeholder">http://192.168.1.10:2283</string>
     <string name="settings_key_hint">API Key (Immich 设置 → API 密钥)</string>
     <string name="settings_save">保存</string>
     <string name="settings_test">测试连接</string>
@@ -10,4 +12,13 @@
     <string name="settings_testing">连接测试中…</string>
     <string name="settings_ok">连接成功：Immich %1$s，共 %2$d 个相册</string>
     <string name="settings_failed">连接失败：%1$s</string>
+    <string name="xposed_description">在 ColorOS 文件选择器的文件页注入 Immich 来源，并提供 Immich 的 SAF 文档源</string>
+    <string name="albums_title">Immich 相册</string>
+    <string name="loading">加载中…</string>
+    <string name="empty">没有内容</string>
+    <string name="not_configured">未配置 Immich 服务器，请先打开应用设置</string>
+    <string name="error_fmt">出错了：%1$s</string>
+    <string name="photo">照片</string>
+    <string name="all_photos">全部照片</string>
+    <string name="video_badge">▶ 视频</string>
 </resources>

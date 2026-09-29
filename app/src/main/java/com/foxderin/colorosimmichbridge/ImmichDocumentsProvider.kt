@@ -9,6 +9,7 @@ import android.provider.DocumentsProvider
 import android.util.Log
 import java.io.File
 import java.io.FileNotFoundException
+import android.webkit.MimeTypeMap
 
 /**
  * Exposes an Immich server as an Android Storage Access Framework provider,
@@ -54,28 +55,74 @@ class ImmichDocumentsProvider : DocumentsProvider() {
 
     override fun onCreate(): Boolean {
         Log.d(TAG, "DocumentsProvider created")
+        // Invalidate DocumentsUI's framework-side roots cache so icon/metadata
+        // changes show without wiping DocumentsUI data.
+        context?.contentResolver?.notifyChange(
+            DocumentsContract.buildRootsUri(AUTHORITY), null
+        )
         return true
+    }
+
+    /**
+     * Looks up asset metadata: in-memory cache first, then a network fetch.
+     * The cache is empty in the common pick-result flow (the caller queries the
+     * returned URI against a cold provider process), so the fetch is essential.
+     */
+    private fun resolveAsset(assetId: String): ImmichAsset? {
+        assetsById[assetId]?.let { return it }
+        context?.let { ctx ->
+            Prefs.loadAssetMeta(ctx, assetId)?.let {
+                assetsById[assetId] = it
+                return it
+            }
+        }
+        val asset = runCatching { api().getAsset(assetId) }.getOrNull()
+        if (asset != null) {
+            assetsById[assetId] = asset
+        } else {
+            Log.w(TAG, "resolveAsset failed for $assetId")
+        }
+        return asset
+    }
+
+    /** Concrete MIME from the file extension; callers reject wildcard types. */
+    private fun mimeOf(asset: ImmichAsset): String {
+        val ext = asset.name.substringAfterLast('.', "").lowercase()
+        val mapped = if (ext.isNotEmpty()) {
+            MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext)
+        } else {
+            null
+        }
+        return mapped ?: if (asset.isVideo) "video/mp4" else "image/jpeg"
     }
 
     // ---------------------------------------------------------------- roots
 
     override fun queryRoots(projection: Array<out String>?): Cursor {
+        // DocumentsUI's ProvidersCache queries with a NULL projection; every
+        // column we add() below must be in this default set or MatrixCursor
+        // silently drops it (icon=0 -> blank icon was exactly this).
         val cursor = MatrixCursor(projection ?: arrayOf(
             DocumentsContract.Root.COLUMN_ROOT_ID,
             DocumentsContract.Root.COLUMN_DOCUMENT_ID,
             DocumentsContract.Root.COLUMN_TITLE,
+            DocumentsContract.Root.COLUMN_ICON,
+            DocumentsContract.Root.COLUMN_SUMMARY,
             DocumentsContract.Root.COLUMN_FLAGS,
             DocumentsContract.Root.COLUMN_MIME_TYPES,
+            DocumentsContract.Root.COLUMN_AVAILABLE_BYTES,
         ))
         val (url, _) = Prefs.load(context ?: return cursor)
         cursor.newRow().apply {
             add(DocumentsContract.Root.COLUMN_ROOT_ID, ROOT_ID)
             add(DocumentsContract.Root.COLUMN_DOCUMENT_ID, ROOT_ID)
             add(DocumentsContract.Root.COLUMN_TITLE, "Immich")
+            // DocumentsUI loads the icon from our package resources by id.
+            add(DocumentsContract.Root.COLUMN_ICON, R.drawable.ic_root)
             add(DocumentsContract.Root.COLUMN_SUMMARY, url.ifBlank { "未配置服务器" })
             add(
                 DocumentsContract.Root.COLUMN_FLAGS,
-                DocumentsContract.Root.FLAG_SUPPORTS_IS_CHILD,
+                DocumentsContract.Root.FLAG_SUPPORTS_IS_CHILD or DocumentsContract.Root.FLAG_SUPPORTS_RECENTS,
             )
             add(DocumentsContract.Root.COLUMN_MIME_TYPES, "*/*")
             add(DocumentsContract.Root.COLUMN_AVAILABLE_BYTES, 0)
@@ -134,8 +181,8 @@ class ImmichDocumentsProvider : DocumentsProvider() {
                     cursor,
                     ASSET_PREFIX + asset.id,
                     asset.name,
-                    if (asset.isVideo) "video/*" else "image/*",
-                    asset.sizeBytes,
+                    mimeOf(asset),
+                    asset.sizeBytes.takeIf { it > 0 },
                     asset.modifiedMs,
                     DocumentsContract.Document.FLAG_SUPPORTS_THUMBNAIL,
                 )
@@ -152,7 +199,8 @@ class ImmichDocumentsProvider : DocumentsProvider() {
         documentId: String,
         displayName: String,
         mimeType: String,
-        size: Long,
+        // null = unknown size; 0 would read as "empty file" to validators.
+        size: Long?,
         lastModified: Long,
         flags: Int,
     ) {
@@ -182,14 +230,16 @@ class ImmichDocumentsProvider : DocumentsProvider() {
                 DocumentsContract.Document.MIME_TYPE_DIR, 0, 0, 0
             )
             documentId.startsWith(ASSET_PREFIX) -> {
-                val asset = assetsById[documentId.removePrefix(ASSET_PREFIX)]
+                val asset = resolveAsset(documentId.removePrefix(ASSET_PREFIX))
                 if (asset != null) {
                     addDocument(
                         cursor, documentId, asset.name,
-                        if (asset.isVideo) "video/*" else "image/*",
-                        asset.sizeBytes, asset.modifiedMs,
+                        mimeOf(asset),
+                        asset.sizeBytes.takeIf { it > 0 }, asset.modifiedMs,
                         DocumentsContract.Document.FLAG_SUPPORTS_THUMBNAIL,
                     )
+                } else {
+                    Log.w(TAG, "queryDocument $documentId -> empty cursor")
                 }
             }
         }
@@ -198,8 +248,10 @@ class ImmichDocumentsProvider : DocumentsProvider() {
 
     override fun getDocumentType(documentId: String): String {
         if (documentId.startsWith(ASSET_PREFIX)) {
-            return assetsById[documentId.removePrefix(ASSET_PREFIX)]
-                ?.let { if (it.isVideo) "video/*" else "image/*" } ?: "application/octet-stream"
+            val asset = resolveAsset(documentId.removePrefix(ASSET_PREFIX))
+            val mime = asset?.let { mimeOf(it) } ?: "application/octet-stream"
+            Log.d(TAG, "getDocumentType $documentId -> $mime")
+            return mime
         }
         return DocumentsContract.Document.MIME_TYPE_DIR
     }
@@ -215,8 +267,7 @@ class ImmichDocumentsProvider : DocumentsProvider() {
             throw FileNotFoundException("Not a file: $documentId")
         }
         val assetId = documentId.removePrefix(ASSET_PREFIX)
-        val asset = assetsById[assetId]
-        val name = asset?.name ?: assetId
+        val name = resolveAsset(assetId)?.name ?: assetId
         val file = cacheFile("orig", assetId, name)
 
         if (!file.exists() || file.length() == 0L) {

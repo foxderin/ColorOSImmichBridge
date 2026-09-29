@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <com.google.android.material.appbar.AppBarLayout
+        android:id="@+id/app_bar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <com.google.android.material.appbar.MaterialToolbar
+            android:id="@+id/toolbar"
+            android:layout_width="match_parent"
+            android:layout_height="?attr/actionBarSize"
+            app:title="@string/app_name"/>
+    </com.google.android.material.appbar.AppBarLayout>
+
+    <ScrollView
+        android:id="@+id/scroll"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true">
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <com.google.android.material.card.MaterialCardView
+                style="@style/Widget.ImmichBridge.Card.Filled"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/settings_section_server"
+                        android:textAppearance="?attr/textAppearanceTitleMedium"/>
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:id="@+id/url_layout"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="16dp"
+                        android:hint="@string/settings_url_hint"
+                        app:placeholderText="@string/settings_url_placeholder">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/url_field"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="textUri"/>
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:id="@+id/key_layout"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:hint="@string/settings_key_hint"
+                        app:endIconMode="password_toggle">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/key_field"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="textPassword"/>
+                    </com.google.android.material.textfield.TextInputLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:orientation="horizontal">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/save_button"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="6dp"
+                    android:layout_weight="1"
+                    android:text="@string/settings_save"/>
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/test_button"
+                    style="@style/Widget.Material3.Button.TonalButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:layout_weight="1"
+                    android:text="@string/settings_test"/>
+            </LinearLayout>
+
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/status_card"
+                style="@style/Widget.ImmichBridge.Card.Filled"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/status_text"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:padding="16dp"
+                    android:textAppearance="?attr/textAppearanceBodyMedium"
+                    android:textIsSelectable="true"/>
+            </com.google.android.material.card.MaterialCardView>
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>

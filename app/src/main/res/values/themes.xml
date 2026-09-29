@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Material You: wallpaper-derived dynamic colors on Android 12+,
+         static MD3 baseline palette on API 30. -->
+    <style name="Theme.ImmichBridge" parent="Theme.Material3.DynamicColors.DayNight.NoActionBar"/>
+
+    <style name="Widget.ImmichBridge.Card.Filled" parent="Widget.Material3.CardView.Filled">
+        <item name="cardCornerRadius">16dp</item>
+    </style>
+
+    <style name="Widget.ImmichBridge.GridCard" parent="Widget.Material3.CardView.Filled">
+        <item name="cardCornerRadius">12dp</item>
+    </style>
+</resources>
