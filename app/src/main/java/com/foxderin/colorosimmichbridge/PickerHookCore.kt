@@ -224,11 +224,14 @@ object PickerHookCore {
             val intent = Intent().setClassName(MODULE_PACKAGE, IMMICH_PICKER_ACTIVITY)
                 .putExtra(MediaSpec.EXTRA_IMAGES, currentSpec.images)
                 .putExtra(MediaSpec.EXTRA_VIDEOS, currentSpec.videos)
-            if (host is Activity) {
+            // The picker host has a caller waiting for a result; anywhere else
+            // (main UI, album set…) our UI opens in browse mode.
+            val pickerHost = (host as? Activity)
+                ?.javaClass?.name?.contains("PickerActivity") == true
+            if (pickerHost) {
                 host.startActivityForResult(intent, REQUEST_IMMICH)
                 log("Launched Immich picker from source row")
             } else {
-                // Main-UI listener: no result caller; open in browse mode.
                 host.startActivity(
                     intent.putExtra(EXTRA_BROWSE_ONLY, true)
                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
